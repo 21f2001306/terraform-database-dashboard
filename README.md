@@ -1,4 +1,3 @@
-
 # WHATS'ON Dashboard — Terraform Module
 
 A reusable Terraform module that deploys the WHATS'ON RDS Dashboard — a web app for monitoring Oracle RDS instances across multiple AWS accounts.
@@ -132,7 +131,7 @@ Rough monthly estimate for a low-traffic dashboard:
 | API Gateway                | ~$0 (free tier covers it) |
 | DynamoDB (pay-per-request) | < $1                      |
 | S3                         | < $1                      |
-| CloudFront                 | < $1 (PriceClass_100)     |
+| CloudFront                 | < $1 (PriceClass_All)     |
 | CloudWatch Logs (14 days)  | < $1                      |
 | TOTAL                      | ~$2-5/month               |
 
