@@ -1,36 +1,7 @@
-=============== START COPY ===============
 
 # WHATS'ON Dashboard — Terraform Module
 
 A reusable Terraform module that deploys the WHATS'ON RDS Dashboard — a web app for monitoring Oracle RDS instances across multiple AWS accounts.
-
-## What It Deploys
-
-                  +--------------+
-
-Browser --> | CloudFront | (HTTPS, global CDN)
-+------+-------+
-|
-v
-+--------------+
-| S3 | (private, HTML/JS/CSS)
-+--------------+
-
-                  +--------------+
-
-Frontend --> | API Gateway | (HTTP API)
-+------+-------+
-|
-v
-+--------------+
-| Lambda | (Python — reads RDS, manages metadata)
-+--+--------+--+
-| |
-v v
-+----------+ +-------------------+
-| DynamoDB | | RDS (this acct) |
-+----------+ | RDS (cross acct) | via assume-role
-+-------------------+
 
 ## Quick Start — Single-Account Deployment
 
