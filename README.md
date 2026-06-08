@@ -10,7 +10,7 @@ A reusable Terraform module that deploys the WHATS'ON RDS Dashboard — a web ap
     }
 
     module "dashboard" {
-      source = "git::https://gitlab.com/your-org/whatson-dashboard-terraform.git?ref=v1.0.0"
+      source = "git::https://github.com/whatson-dashboard-terraform.git?ref=v1.0.0"
 
       app_name = "whatson"
     }
@@ -35,7 +35,7 @@ For accessing RDS in multiple AWS accounts, this is a three-step process.
 ### Step 1 — Deploy the dashboard (in your "main" account)
 
     module "dashboard" {
-      source = "git::https://gitlab.com/your-org/whatson-dashboard-terraform.git?ref=v1.0.0"
+      source = "git::https://github.com/whatson-dashboard-terraform.git?ref=v1.0.0"
 
       app_name = "whatson"
     }
@@ -49,7 +49,7 @@ Apply. Note the `lambda_role_arn` output:
 Switch credentials to the target account, then:
 
     module "cross_account_role" {
-      source = "git::https://gitlab.com/your-org/whatson-dashboard-terraform.git//modules/cross-account-role?ref=v1.0.0"
+      source = "git::https://github.com/whatson-dashboard-terraform.git//modules/cross-account-role?ref=v1.0.0"
 
       trusted_lambda_role_arn = "arn:aws:iam::AAAAAAAAAAAA:role/whatson-api-role"
     }
@@ -65,7 +65,7 @@ Repeat for each target account.
 Back in the dashboard config:
 
     module "dashboard" {
-      source = "git::https://gitlab.com/your-org/whatson-dashboard-terraform.git?ref=v1.0.0"
+      source = "git::https://github.com/whatson-dashboard-terraform.git?ref=v1.0.0"
 
       app_name = "whatson"
 
