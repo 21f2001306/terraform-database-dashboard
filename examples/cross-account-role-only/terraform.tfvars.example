@@ -1,0 +1,7 @@
+aws_region = "eu-west-2"
+
+# Get this from the main dashboard's 'lambda_role_arn' output:
+trusted_lambda_role_arn = "arn:aws:iam::123456789012:role/whatson-tf-test-api-role"
+
+# Optional: customize role name (default: whatson-dashboard-readonly)
+# role_name = "whatson-dashboard-readonly"

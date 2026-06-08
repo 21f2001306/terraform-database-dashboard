@@ -1,0 +1,5 @@
+# Copy this file to terraform.tfvars and edit values.
+# terraform.tfvars is gitignored to keep your values private.
+
+app_name   = "whatson-basic"
+aws_region = "eu-west-2"

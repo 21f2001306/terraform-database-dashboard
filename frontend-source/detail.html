@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WHATS'ON Database Detail</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>WHATS'ON International Databases</h1>
+
+      <p class="breadcrumb">
+        <a href="index.html">Databases</a>
+        <span class="separator">/</span>
+        <span id="breadcrumbName" class="current">Loading...</span>
+      </p>
+      <hr />
+
+      <!-- Loading -->
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading database details...</p>
+      </div>
+
+      <!-- Error -->
+      <div id="error" class="message error hidden"></div>
+
+      <!-- Detail content -->
+      <div id="detailContainer" class="hidden">
+        <div class="detail-grid">
+          <div class="detail-label">Database Name:</div>
+          <div class="detail-value" id="databaseName"></div>
+
+          <div class="detail-label">Instance Name:</div>
+          <div class="detail-value" id="instanceName"></div>
+
+          <div class="detail-label">Status:</div>
+          <div class="detail-value" id="status"></div>
+
+          <div class="detail-label">Endpoint:</div>
+          <div class="detail-value" id="endpoint"></div>
+
+          <div class="detail-label">Creation Date:</div>
+          <div class="detail-value" id="creationDate"></div>
+
+          <div class="detail-label">Source Snapshot:</div>
+          <div class="detail-value" id="sourceSnapshot"></div>
+
+          <div class="detail-label">Source Instance:</div>
+          <div class="detail-value" id="sourceInstance"></div>
+
+          <div class="detail-label">Latest Restorable Time:</div>
+          <div class="detail-value" id="latestRestorableTime"></div>
+
+          <div class="detail-label">Database Version:</div>
+          <div class="detail-value" id="databaseVersion"></div>
+        </div>
+
+        <div class="metadata-tab">Metadata</div>
+        <div class="metadata-section">
+          <form id="metadataForm">
+            <div class="form-row">
+              <label for="applicationVersion">Application Version:</label>
+              <input
+                type="text"
+                id="applicationVersion"
+                name="applicationVersion"
+              />
+            </div>
+            <div class="form-row">
+              <label for="lastUpgradeDate">Last Upgrade Date:</label>
+              <input type="text" id="lastUpgradeDate" name="lastUpgradeDate" />
+            </div>
+            <div class="form-row">
+              <label for="environment">Environment:</label>
+              <select id="environment" name="environment">
+                <option value="">-- Select --</option>
+                <option value="Production">Production</option>
+                <option value="Non-Production">Non-Production</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="owner">Owner:</label>
+              <input type="text" id="owner" name="owner" />
+            </div>
+            <div class="form-row">
+              <label for="functionality">Functionality:</label>
+              <textarea
+                id="functionality"
+                name="functionality"
+                rows="2"
+              ></textarea>
+            </div>
+
+            <button type="submit" class="apply-btn" id="applyBtn">Apply</button>
+
+            <div id="formMessage"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/detail.js"></script>
+  </body>
+</html>

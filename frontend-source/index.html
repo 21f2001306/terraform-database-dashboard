@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WHATS'ON International Databases</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-header">
+        <h1>WHATS'ON International Databases</h1>
+        <button id="refreshBtn" class="refresh-btn" title="Refresh">
+          <span class="refresh-icon">↻</span>
+          <span>Refresh</span>
+        </button>
+      </div>
+      <hr />
+
+      <!-- Loading -->
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading databases...</p>
+      </div>
+
+      <!-- Error -->
+      <div id="error" class="message error hidden"></div>
+
+      <!-- Table -->
+      <div id="tableContainer" class="table-wrapper hidden">
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th>Database</th>
+              <th>Instance</th>
+              <th>Status</th>
+              <th>Environment</th>
+              <th>Creation Date</th>
+              <th>Source Instance</th>
+              <th>Owner</th>
+              <th>Functionality</th>
+              <th>App Version</th>
+              <th>Last Upgrade</th>
+              <th>Oracle Version</th>
+            </tr>
+          </thead>
+          <tbody id="databasesTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/index.js"></script>
+  </body>
+</html>
