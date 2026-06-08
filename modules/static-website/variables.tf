@@ -16,7 +16,7 @@ variable "api_base_url" {
 variable "cloudfront_price_class" {
   description = "CloudFront price class. PriceClass_100 = NA + EU only (cheapest), PriceClass_200 = + Asia, PriceClass_All = global."
   type        = string
-  default     = "PriceClass_100"
+  default     = "PriceClass_All"
 
   validation {
     condition     = contains(["PriceClass_100", "PriceClass_200", "PriceClass_All"], var.cloudfront_price_class)
