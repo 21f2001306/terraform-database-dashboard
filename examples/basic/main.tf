@@ -41,7 +41,7 @@ output "lambda_role_arn" {
   value = module.dashboard.lambda_role_arn
 }
 
-# ---------- Variables ----------
+# Variables
 
 variable "app_name" {
   type    = string

@@ -33,7 +33,7 @@ output "account_id" {
   value = module.cross_account_role.account_id
 }
 
-# ---------- Variables ----------
+# Variables
 
 variable "aws_region" {
   type    = string
