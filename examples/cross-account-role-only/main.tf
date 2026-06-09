@@ -1,10 +1,8 @@
-# ============================================
 # Example: Cross-account role only
 # Run this in EACH account that holds RDS instances
 # you want the dashboard Lambda to read.
 #
 # Configure AWS credentials for THIS account, then apply.
-# ============================================
 
 terraform {
   required_version = ">= 1.5.0"

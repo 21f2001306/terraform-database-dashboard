@@ -1,8 +1,6 @@
-# ============================================
 # Example: Basic deployment
 # Deploys the dashboard in a single account.
 # Lambda will only see RDS instances in THIS account.
-# ============================================
 
 terraform {
   required_version = ">= 1.5.0"
@@ -14,7 +12,7 @@ provider "aws" {
 
 module "dashboard" {
   # Local source — adjust if using this in your own repo:
-  # source = "git::https://github.com/whatson-dashboard-terraform.git?ref=v1.0.0"
+  # source = "git::https://github.com/whatson-dashboard-terraform"
   source = "../.."
 
   app_name   = var.app_name

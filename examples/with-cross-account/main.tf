@@ -1,4 +1,3 @@
-# ============================================
 # Example: Dashboard with cross-account RDS access
 # Deploys the dashboard and configures it to assume roles
 # in other accounts to read their RDS instances.
@@ -6,7 +5,6 @@
 # PREREQUISITE: You must have already deployed the
 # 'cross-account-role' module in each target account
 # (see examples/cross-account-role-only).
-# ============================================
 
 terraform {
   required_version = ">= 1.5.0"
@@ -44,7 +42,7 @@ output "lambda_role_arn" {
   value       = module.dashboard.lambda_role_arn
 }
 
-# ---------- Variables ----------
+# Variables
 
 variable "app_name" {
   type    = string
