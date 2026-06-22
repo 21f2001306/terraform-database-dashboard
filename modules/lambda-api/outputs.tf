@@ -37,3 +37,9 @@ output "api_execution_arn" {
   description = "Execution ARN of the API Gateway."
   value       = aws_apigatewayv2_api.main.execution_arn
 }
+
+output "api_gateway_domain_name" {
+  # Stripping the https:// scheme — CloudFront origin wants host only
+  value       = replace(aws_apigatewayv2_api.main.api_endpoint, "https://", "")
+  description = "API Gateway domain name (host only) for CloudFront origin."
+}

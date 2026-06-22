@@ -19,7 +19,8 @@ async function loadDatabases() {
   tableContainer.classList.add("hidden");
 
   try {
-    const response = await fetch(`${API_BASE_URL}/databases`);
+    const response = await apiFetch(`${API_BASE_URL}/databases`); // <-- changed
+    if (!response) return; // redirecting due to 401
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

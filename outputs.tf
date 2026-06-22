@@ -48,3 +48,41 @@ output "dashboard_url" {
   description = "Open this URL to access the dashboard."
   value       = module.static_website.dashboard_url
 }
+
+output "cloudfront_domain_name" {
+  description = "CloudFront domain name (e.g., abc123.cloudfront.net)."
+  value       = aws_cloudfront_distribution.frontend.domain_name
+}
+
+# ---------- Cognito ----------
+
+output "cognito_user_pool_id" {
+  value       = module.cognito.user_pool_id
+  description = "Cognito User Pool ID."
+}
+
+output "cognito_user_pool_arn" {
+  value       = module.cognito.user_pool_arn
+  description = "Cognito User Pool ARN (needed by the SAR Lambda@Edge app)."
+}
+
+output "cognito_app_client_id" {
+  value       = module.cognito.app_client_id
+  description = "Cognito App Client ID."
+}
+
+output "cognito_app_client_secret" {
+  value       = module.cognito.app_client_secret
+  sensitive   = true
+  description = "Cognito App Client secret (needed by the SAR Lambda@Edge app)."
+}
+
+output "cognito_hosted_ui_url" {
+  value       = module.cognito.hosted_ui_url
+  description = "Cognito Hosted UI URL."
+}
+
+output "origin_verify_secret_arn" {
+  value       = aws_secretsmanager_secret.origin_verify.arn
+  description = "ARN of the origin-verify secret."
+}

@@ -6,8 +6,12 @@ from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 AWS_REGION = os.environ.get('AWS_REGION', 'eu-west-2')
-DEBUG = os.environ.get("DEBUG", "false") == "true"
 METADATA_TABLE = os.environ.get('METADATA_TABLE', 'whatson-database-metadata')
+ORIGIN_VERIFY_SECRET_ARN = os.environ.get('ORIGIN_VERIFY_SECRET_ARN', '')
+
+# In-memory cache for the origin-verify secret (avoids calling Secrets Manager every request)
+_origin_secret_cache = {'value': None, 'fetched_at': 0}
+ORIGIN_SECRET_CACHE_TTL = 300  # seconds (5 minutes)
 
 CROSS_ACCOUNT_ROLES = [
     arn.strip() for arn in os.environ.get('CROSS_ACCOUNT_ROLES', '').split(',') if arn.strip()
@@ -15,66 +19,40 @@ CROSS_ACCOUNT_ROLES = [
 
 sts_client = boto3.client('sts', region_name=AWS_REGION)
 local_session = boto3.Session(region_name=AWS_REGION)
+secrets_client = boto3.client('secretsmanager', region_name=AWS_REGION)
 
 # DynamoDB client (always in local account)
 dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)
 metadata_table = dynamodb.Table(METADATA_TABLE)
 
-# Allowed origins for CORS
-ALLOWED_ORIGINS = [
-    origin.strip() for origin in os.environ.get(
-        'ALLOWED_ORIGINS',
-        'http://127.0.0.1:3000,http://localhost:3000'
-    ).split(',') if origin.strip()
-]
-
-
-def _build_cors_headers(event):
-    """Returns CORS headers, reflecting the request origin if allowed."""
-    request_origin = ''
-    if event:
-        headers = event.get('headers') or {}
-        # API Gateway lowercases header names
-        request_origin = headers.get('origin') or headers.get('Origin') or ''
-
-    allow_origin = request_origin if request_origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
-
-    return {
-        'Access-Control-Allow-Origin': allow_origin,
-        'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Content-Type': 'application/json'
-    }
-
 
 # ENTRY POINT
 
 def lambda_handler(event, context):
+    headers = event.get('headers') or {}
+    origin_verify = headers.get('x-origin-verify', '')
+    expected_secret = _get_origin_verify_secret()
+    if expected_secret and origin_verify != expected_secret:
+        return _response(403, {'error': 'Forbidden'})
+
     try:
         route_key = event.get('routeKey', '')
-        method = event.get('requestContext', {}).get('http', {}).get('method', '')
         path_params = event.get('pathParameters', {}) or {}
 
-        if DEBUG:
-            print(f"{method} {route_key}")
-
-        if method == 'OPTIONS':
-            return _response(200, {}, event)
-
         if route_key == 'GET /databases':
-            return list_databases(event)
+            return list_databases()
 
         elif route_key == 'GET /databases/{instanceName}':
-            return get_database_detail(path_params.get('instanceName'), event)
+            return get_database_detail(path_params.get('instanceName'))
 
         elif route_key == 'PUT /databases/{instanceName}/metadata':
-            return update_metadata(path_params.get('instanceName'), event.get('body'), event)
+            return update_metadata(path_params.get('instanceName'), event.get('body'))
 
-        return _response(404, {'error': f'Route not found: {route_key}'}, event)
+        return _response(404, {'error': f'Route not found: {route_key}'})
 
     except Exception as e:
         print(f"Unhandled error: {e}")
-        return _response(500, {'error': 'Internal server error'}, event)
+        return _response(500, {'error': 'Internal server error'})
 
 
 # ACCOUNT HANDLING
@@ -126,10 +104,7 @@ def _get_account_alias(session, account_id):
     try:
         iam = session.client('iam')
         aliases = iam.list_account_aliases().get('AccountAliases', [])
-        alias = aliases[0] if aliases else account_id
-        if DEBUG:
-            print(f"[ALIAS] {account_id} → '{alias}'")
-        return alias
+        return aliases[0] if aliases else account_id
     except ClientError as e:
         print(f"[ALIAS ERROR] Could not fetch alias for {account_id}: {e}")
         return account_id
@@ -189,7 +164,7 @@ def _get_metadata_for(instance_name):
 
 
 def _save_metadata(instance_name, metadata_dict):
-    """Saves metadata to DynamoDB. 
+    """Saves metadata to DynamoDB.
     Includes user-editable fields AND auto-cached snapshot fields"""
     item = {
         'instanceName': instance_name,
@@ -202,7 +177,6 @@ def _save_metadata(instance_name, metadata_dict):
         'sourceInstance': metadata_dict.get('sourceInstance', ''),
         'cachedCreationDate': metadata_dict.get('cachedCreationDate', ''),
         'updatedAt': int(time.time())
-
     }
 
     metadata_table.put_item(Item=item)
@@ -244,6 +218,7 @@ def _fetch_databases_no_metadata(session, account_id, environment):
 
     return databases
 
+
 def _get_restore_info_from_events(rds_client, instance_name):
     """
     Calls describe_events to find the MOST RECENT 'Restored from snapshot' event.
@@ -263,40 +238,32 @@ def _get_restore_info_from_events(rds_client, instance_name):
         # Find the LATEST restore event across ALL pages
         # (events are returned oldest-first by AWS, so keep overwriting → final = newest)
         latest_snapshot = None
-        total_events = 0
 
         for page in page_iterator:
-            events = page.get('Events', [])
-            total_events += len(events)
-            for event in events:
+            for event in page.get('Events', []):
                 message = event.get('Message', '')
                 if message.startswith('Restored from snapshot '):
                     latest_snapshot = message.replace('Restored from snapshot ', '').strip()
 
-        if DEBUG:
-            print(f"[EVENTS] {instance_name} scanned {total_events} events")
-
         if latest_snapshot:
             result['sourceSnapshot'] = latest_snapshot
             result['sourceInstance'] = _parse_source_instance(latest_snapshot)
-
-            if DEBUG:
-                print(f"[RESTORE EVENT] {instance_name} ← {latest_snapshot}")
 
     except ClientError as e:
         print(f"Error fetching events for {instance_name}: {e}")
 
     return result
 
+
 def _parse_source_instance(snapshot_name):
     """
     Extracts the source instance name from a snapshot name.
-    
+
     Examples:
       bruce-twdcemea-wonprd-20260525-0030-3051-cpy-reencrypted → twdcemea-wonprd
       rds:twdcemea-postprod-2026-05-12-03-14                  → twdcemea-postprod
       twdcemea-wonuat-manual-snapshot                          → twdcemea-wonuat
-    
+
     Looks for the 'twdcemea-xxx' pattern. Returns '' if not found.
     """
     if not snapshot_name:
@@ -312,6 +279,7 @@ def _parse_source_instance(snapshot_name):
             return f"twdcemea-{parts[i + 1]}"
 
     return ''
+
 
 def _fetch_single_db(session, instance_name):
     rds = session.client('rds')
@@ -335,15 +303,8 @@ def _fetch_single_db(session, instance_name):
             # FAST PATH: cache is valid and matches current state
             source_snapshot = cached_snapshot
             source_instance = cached_source_inst
-            if DEBUG:
-                print(f"[CACHE HIT] {instance_name} snapshot from cache")
         else:
             # SLOW PATH: cache missing or DB was restored — fetch fresh
-            if DEBUG:
-                reason = "no cache" if not cached_snapshot else f"creation date changed ({cached_creation_date} → {current_creation_date})"
-                print(f"[CACHE MISS] {instance_name} — {reason}")
-
-
             restore_info = _get_restore_info_from_events(rds, instance_name)
             fresh_snapshot = restore_info['sourceSnapshot']
             fresh_source_inst = restore_info['sourceInstance']
@@ -353,22 +314,17 @@ def _fetch_single_db(session, instance_name):
                 source_snapshot = fresh_snapshot
                 source_instance = fresh_source_inst
 
-                 # Persist to DynamoDB for next time (merge with existing user metadata)
+                # Persist to DynamoDB for next time (merge with existing user metadata)
                 updated_meta = dict(meta)  # Preserve user fields
                 updated_meta['sourceSnapshot'] = fresh_snapshot
                 updated_meta['sourceInstance'] = fresh_source_inst
                 updated_meta['cachedCreationDate'] = current_creation_date
                 _save_metadata(instance_name, updated_meta)
-                if DEBUG:
-                        print(f"[CACHE UPDATE] {instance_name} → {fresh_snapshot}")
-
             else:
                 # Events returned nothing (aged out or never restored)
                 # Keep using the old cached value rather than blanking it out
                 source_snapshot = cached_snapshot
                 source_instance = cached_source_inst
-                if DEBUG:
-                    print(f"[CACHE KEEP] {instance_name} — events empty, keeping old cache: {cached_snapshot or '(none)'}")
 
         # Fallback for source instance: if events didn't have it, try replica source
         if not source_instance:
@@ -396,9 +352,10 @@ def _fetch_single_db(session, instance_name):
         print(f"Error fetching {instance_name}: {e}")
         return None
 
+
 # ROUTES
 
-def list_databases(event):
+def list_databases():
     """
     Fetches RDS instances from all accounts AND metadata from DynamoDB,
     all in parallel for maximum speed.
@@ -426,9 +383,6 @@ def list_databases(event):
         # Wait for metadata
         metadata_lookup = metadata_future.result()
 
-        if DEBUG:
-            print(f"Loaded metadata for {len(metadata_lookup)} instances")
-
         # Collect account results as they complete
         for future in as_completed(account_futures):
             acc = account_futures[future]
@@ -444,9 +398,6 @@ def list_databases(event):
                     db['sourceInstance'] = meta.get('sourceInstance', '')
 
                 all_databases.extend(dbs)
-
-                if DEBUG:
-                    print(f"{acc['account_id']} ({acc['environment']}) → {len(dbs)} DBs")
             except Exception as e:
                 print(f"Error fetching from {acc['account_id']}: {e}")
 
@@ -455,56 +406,87 @@ def list_databases(event):
         d.get('databaseName') or ''
     ))
 
-    return _response(200, {'databases': all_databases}, event)
+    return _response(200, {'databases': all_databases})
 
 
-def get_database_detail(instance_name, event):
+def get_database_detail(instance_name):
     if not instance_name:
-         return _response(400, {'error': 'instanceName is required'}, event)
+        return _response(400, {'error': 'instanceName is required'})
 
     for acc in _iterate_accounts():
         db = _fetch_single_db(acc['session'], instance_name)
         if db:
             db['environment'] = acc['environment']
             db['accountId'] = acc['account_id']
-            return _response(200, {'database': db}, event)
+            return _response(200, {'database': db})
 
-    return _response(404, {'error': 'Database not found'}, event)
+    return _response(404, {'error': 'Database not found'})
 
 
-def update_metadata(instance_name, body, event):
+def update_metadata(instance_name, body):
     if not instance_name:
-        return _response(400, {'error': 'instanceName is required'}, event)
+        return _response(400, {'error': 'instanceName is required'})
 
     try:
         body = json.loads(body or '{}') if isinstance(body, str) else (body or {})
 
         if not isinstance(body, dict):
-            return _response(400, {'error': 'Invalid JSON body'}, event)
+            return _response(400, {'error': 'Invalid JSON body'})
 
         saved_item = _save_metadata(instance_name, body)
-
-        if DEBUG:
-            print(f"[SAVED] {json.dumps(saved_item, default=str)}")
 
         return _response(200, {
             'message': 'Metadata saved successfully',
             'data': saved_item
-        }, event)
+        })
 
     except json.JSONDecodeError:
-        return _response(400, {'error': 'Invalid JSON'}, event)
+        return _response(400, {'error': 'Invalid JSON'})
     except ClientError as e:
         print(f"DynamoDB error: {e}")
-        return _response(500, {'error': 'Failed to save metadata'}, event)
+        return _response(500, {'error': 'Failed to save metadata'})
 
 
 # HELPERS
 
-def _response(status_code, body, event=None):
+def _get_origin_verify_secret():
+    """
+    Fetches the origin-verify secret from Secrets Manager, with a 5-minute cache.
+    Returns '' if not configured or on error (fails closed via the handler check).
+    """
+    if not ORIGIN_VERIFY_SECRET_ARN:
+        return ''
+
+    now = time.time()
+    cached = _origin_secret_cache['value']
+    if cached is not None and (now - _origin_secret_cache['fetched_at']) < ORIGIN_SECRET_CACHE_TTL:
+        return cached
+
+    try:
+        response = secrets_client.get_secret_value(SecretId=ORIGIN_VERIFY_SECRET_ARN)
+        secret_string = response.get('SecretString', '{}')
+        secret_dict = json.loads(secret_string)
+        secret_value = secret_dict.get('originVerifySecret', '')
+
+        _origin_secret_cache['value'] = secret_value
+        _origin_secret_cache['fetched_at'] = now
+        return secret_value
+
+    except ClientError as e:
+        print(f"Error fetching origin-verify secret: {e}")
+        # Fall back to last cached value if we have one (avoids outage on transient errors)
+        return cached if cached is not None else ''
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing origin-verify secret: {e}")
+        return cached if cached is not None else ''
+
+
+def _response(status_code, body):
     return {
         'statusCode': status_code,
-        'headers': _build_cors_headers(event),
+        'headers': {
+            'Content-Type': 'application/json'
+        },
         'body': json.dumps(body, default=str)
     }
 

@@ -64,3 +64,18 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cognito_issuer_url" {
+  type        = string
+  description = "Cognito issuer URL for the JWT authorizer."
+}
+
+variable "cognito_app_client_id" {
+  type        = string
+  description = "Cognito App Client ID — used as the JWT audience."
+}
+
+variable "origin_verify_secret_arn" {
+  type        = string
+  description = "ARN of the Secrets Manager secret holding the origin-verify value."
+}

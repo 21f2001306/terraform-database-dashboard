@@ -22,9 +22,11 @@ async function loadDatabaseDetail(instanceName) {
   const detailContainer = document.getElementById("detailContainer");
 
   try {
-    const response = await fetch(
+    const response = await apiFetch(
+      // <-- changed
       `${API_BASE_URL}/databases/${encodeURIComponent(instanceName)}`,
     );
+    if (!response) return; // redirecting due to 401
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -91,7 +93,8 @@ async function handleFormSubmit(event) {
   messageEl.innerHTML = "";
 
   try {
-    const response = await fetch(
+    const response = await apiFetch(
+      // <-- changed
       `${API_BASE_URL}/databases/${encodeURIComponent(currentInstanceName)}/metadata`,
       {
         method: "PUT",
@@ -100,20 +103,21 @@ async function handleFormSubmit(event) {
       },
     );
 
+    if (!response) return; // redirecting due to 401
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     await response.json();
 
-    messageEl.innerHTML = `<div class="message success">✓ Metadata saved successfully</div>`;
+    messageEl.innerHTML = `<div class="message success">âœ“ Metadata saved successfully</div>`;
     // Auto-hide after 5 seconds
     setTimeout(() => {
       messageEl.innerHTML = "";
     }, 5000);
   } catch (err) {
     console.error("Error updating metadata:", err);
-    messageEl.innerHTML = `<div class="message error">✗ Failed to save: ${err.message}</div>`;
+    messageEl.innerHTML = `<div class="message error">âœ— Failed to save: ${err.message}</div>`;
   } finally {
     applyBtn.disabled = false;
     applyBtn.textContent = "Apply";

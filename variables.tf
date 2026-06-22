@@ -55,3 +55,74 @@ variable "tags" {
     Project   = "whatson-dashboard"
   }
 }
+
+
+variable "cognito_domain_prefix" {
+  type        = string
+  description = "Globally-unique prefix for the Cognito Hosted UI domain."
+}
+
+variable "id_token_validity_minutes" {
+  type        = number
+  default     = 60
+  description = "ID token lifetime in minutes."
+}
+
+variable "access_token_validity_minutes" {
+  type        = number
+  default     = 60
+  description = "Access token lifetime in minutes."
+}
+
+variable "refresh_token_validity_minutes" {
+  type        = number
+  default     = 480
+  description = "Refresh token lifetime in minutes (480 = 8 hours)."
+}
+
+variable "cloudfront_domain_override" {
+  type        = string
+  default     = ""
+  description = <<-EOT
+    CloudFront domain for Cognito callback URLs. Leave empty on FIRST apply;
+    after CloudFront is created, set this to the cloudfront_domain_name output
+    and re-apply (second apply). Breaks the cognito<->cloudfront dependency cycle.
+  EOT
+}
+
+
+variable "enable_edge_auth" {
+  type        = bool
+  default     = false
+  description = "Attach Lambda@Edge auth. false on first apply, true on second (after SAR deployed)."
+}
+
+variable "lambda_edge_check_auth_arn" {
+  type        = string
+  default     = ""
+  description = "SAR check-auth Lambda@Edge versioned ARN."
+}
+
+variable "lambda_edge_http_headers_arn" {
+  type        = string
+  default     = ""
+  description = "SAR http-headers Lambda@Edge versioned ARN."
+}
+
+variable "lambda_edge_parse_auth_arn" {
+  type        = string
+  default     = ""
+  description = "SAR parse-auth Lambda@Edge versioned ARN."
+}
+
+variable "lambda_edge_refresh_auth_arn" {
+  type        = string
+  default     = ""
+  description = "SAR refresh-auth Lambda@Edge versioned ARN."
+}
+
+variable "lambda_edge_sign_out_arn" {
+  type        = string
+  default     = ""
+  description = "SAR sign-out Lambda@Edge versioned ARN."
+}

@@ -147,10 +147,11 @@ resource "aws_lambda_function" "main" {
 
   environment {
     variables = {
-      METADATA_TABLE      = var.dynamodb_table_name
-      CROSS_ACCOUNT_ROLES = join(",", var.cross_account_role_arns)
-      ALLOWED_ORIGINS     = join(",", var.allowed_cors_origins)
-      DEBUG               = var.debug ? "true" : "false"
+      METADATA_TABLE           = var.dynamodb_table_name
+      CROSS_ACCOUNT_ROLES      = join(",", var.cross_account_role_arns)
+      ALLOWED_ORIGINS          = join(",", var.allowed_cors_origins)
+      DEBUG                    = var.debug ? "true" : "false"
+      ORIGIN_VERIFY_SECRET_ARN = var.origin_verify_secret_arn
     }
   }
 
@@ -159,6 +160,20 @@ resource "aws_lambda_function" "main" {
   ]
 
   tags = var.tags
+}
+
+# JWT Authorizer (Cognito)
+
+resource "aws_apigatewayv2_authorizer" "jwt" {
+  api_id           = aws_apigatewayv2_api.main.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "${var.function_name}-cognito-jwt"
+
+  jwt_configuration {
+    issuer   = var.cognito_issuer_url
+    audience = [var.cognito_app_client_id]
+  }
 }
 
 # API Gateway — HTTP API (v2)
@@ -191,23 +206,28 @@ resource "aws_apigatewayv2_integration" "lambda" {
 # Routes
 
 resource "aws_apigatewayv2_route" "list_databases" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "GET /databases"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /databases"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
 resource "aws_apigatewayv2_route" "get_database" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "GET /databases/{instanceName}"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "GET /databases/{instanceName}"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
 
 resource "aws_apigatewayv2_route" "update_metadata" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "PUT /databases/{instanceName}/metadata"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "PUT /databases/{instanceName}/metadata"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
-
 # Default Stage
 
 resource "aws_apigatewayv2_stage" "default" {
@@ -250,4 +270,22 @@ resource "aws_lambda_permission" "api_gateway" {
   function_name = aws_lambda_function.main.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
+
+# Secrets Manager — read the origin-verify secret
+
+data "aws_iam_policy_document" "lambda_secrets" {
+  statement {
+    sid       = "ReadOriginVerifySecret"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [var.origin_verify_secret_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_secrets" {
+  name   = "secrets-read"
+  role   = aws_iam_role.lambda.id
+  policy = data.aws_iam_policy_document.lambda_secrets.json
 }
