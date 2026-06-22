@@ -1,45 +1,87 @@
-# Dashboard with Cross-Account Access
+# Dashboard with Cross-Account Access (v2.0)
 
-Deploys the dashboard with the ability to read RDS instances
-from other AWS accounts.
+Deploys the dashboard with login (Cognito + Lambda@Edge) AND the
+ability to read RDS from other AWS accounts.
 
-## Prerequisites
+> This is the most complex scenario. It combines:
+>
+> - The **two-apply auth flow** (Cognito + SAR Lambda@Edge)
+> - The **cross-account role flow** (roles in each target account)
 
-You must first deploy the `cross-account-role` module in each
-target account. See `../cross-account-role-only` for an example.
+## Full Deployment Order
 
-## Deployment Order
-
-This is a **three-step** process:
-
-### Step 1: Initial deploy (without cross-account roles)
+### Step 1 — First dashboard apply (auth OFF, no cross-account yet)
 
 ```bash
+cp terraform.tfvars.example terraform.tfvars
+# Set a unique cognito_domain_prefix.
+# Leave enable_edge_auth = false.
+# You CAN leave cross_account_role_arns = [] for now.
+
 terraform init
 terraform apply
-# Note the 'lambda_role_arn' output — you'll need it next.
 ```
 
-### Step 2: In EACH target account
+Save outputs: lambda_role_arn, cloudfront_domain_name, cognito_user_pool_arn, cognito_app_client_id, cognito_app_client_secret.
 
-Switch AWS credentials to the target account, then:
+### Step 2 - Deploy cross-account roles (each target account)
 
 cd ../cross-account-role-only
 
-# Set trusted_lambda_role_arn to the value from Step 1
+# Switch AWS credentials to the target account.
+
+# Set trusted_lambda_role_arn = <lambda_role_arn from Step 1>.
 
 terraform apply
 
-# Note the 'role_arn' output — you'll need it for Step 3.
+# Note the role_arn output. Repeat per account.
 
-### Step 3: Update this deployment with the role ARNs
+### Step 3 - Create a cognito test user
 
-Edit terraform.tfvars
+AWS Console → Cognito → your user pool → create user (verify email).
 
-cross_account_role_arns = [
-"arn:aws:iam::<target-account>:role/whatson-dashboard-readonly",
-]
+### Step 4 - Deploy the SAR app (MANUAL, us-east-1)
 
-Then
+Switch console region to N. Virginia. Deploy cloudfront-authorization-at-edge with:
+
+UserPoolArn / UserPoolClientId / UserPoolClientSecret (from Step 1)
+CreateCloudFrontDistribution = false ⚠️
+RedirectPathSignIn = /parseauth
+RedirectPathSignOut = /signout
+RedirectPathAuthRefresh = /refreshauth
+AlternateDomainNames = (cloudfront_domain_name from Step 1)
+Get the 5 Lambda@Edge ARNs from CloudFormation Outputs (each ends :1).
+
+### Step 5 - Second dashboard apply (login ON + cross-account roles)
+
 cd ../with-cross-account
+
+# Edit terraform.tfvars:
+
+# enable_edge_auth = true
+
+# cloudfront_domain_override = "dXXXX.cloudfront.net"
+
+# paste the 5 Lambda@Edge ARNs
+
+# paste cross_account_role_arns from Step 2
+
 terraform apply
+
+### Step 6 - Test
+
+Open https://<cloudfront_domain_name>/ incognito → log in → verify RDS from all accounts appears.
+
+Cleanup
+aws s3 rm s3://<bucket-name> --recursive
+terraform destroy
+
+# Destroy cross-account roles in each target account too.
+
+# Delete the SAR CloudFormation stack (us-east-1).
+
+# Lambda@Edge takes ~1 hour to fully delete.
+
+See the main README (repo root) for troubleshooting.
+
+---

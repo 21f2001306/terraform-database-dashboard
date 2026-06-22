@@ -1,12 +1,24 @@
-app_name   = "whatson-multiaccount"
-aws_region = "eu-west-2"
+app_name              = "whatson-multiaccount"
+aws_region            = "eu-west-2"
+cognito_domain_prefix = "whatson-multi-login-12345"   # globally unique!
 
-# Roles to assume — get these from each prod account's
-# 'cross-account-role' deployment output.
+# ---- Cross-account roles ----
+# Get these from each target account's cross-account-role deployment.
+# Can be left empty [] on the first apply and added later.
 cross_account_role_arns = [
   "arn:aws:iam::111111111111:role/whatson-dashboard-readonly",
   "arn:aws:iam::222222222222:role/whatson-dashboard-readonly",
 ]
 
-# After first deployment, tighten CORS:
-# allowed_cors_origins = ["https://abc123.cloudfront.net"]
+# FIRST APPLY: auth OFF
+enable_edge_auth           = false
+cloudfront_domain_override = ""
+
+# SECOND APPLY: after SAR deploy — uncomment + fill in
+# enable_edge_auth           = true
+# cloudfront_domain_override = "dXXXX.cloudfront.net"
+# lambda_edge_check_auth_arn   = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_http_headers_arn = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_parse_auth_arn   = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_refresh_auth_arn = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_sign_out_arn     = "arn:aws:lambda:us-east-1:ACCT:function:...:1"

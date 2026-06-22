@@ -1,5 +1,26 @@
 # Copy this file to terraform.tfvars and edit values.
 # terraform.tfvars is gitignored to keep your values private.
 
-app_name   = "whatson-basic"
-aws_region = "eu-west-2"
+app_name              = "whatson-basic"
+aws_region            = "eu-west-2"
+
+# MUST be globally unique across all AWS — change the numbers!
+cognito_domain_prefix = "whatson-basic-login-12345"
+
+# FIRST APPLY: leave everything below as-is (auth OFF).
+enable_edge_auth           = false
+cloudfront_domain_override = ""
+
+# SECOND APPLY: after deploying the SAR app (see README),
+# set enable_edge_auth = true, paste the CloudFront domain
+# (from the first apply's 'cloudfront_domain_name' output),
+# and paste the 5 Lambda@Edge ARNs from the SAR CloudFormation
+# stack outputs. Each ARN MUST end with a version (e.g. ':1').
+# enable_edge_auth           = true
+# cloudfront_domain_override = "dXXXXXXXX.cloudfront.net"
+#
+# lambda_edge_check_auth_arn   = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_http_headers_arn = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_parse_auth_arn   = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_refresh_auth_arn = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
+# lambda_edge_sign_out_arn     = "arn:aws:lambda:us-east-1:ACCT:function:...:1"
